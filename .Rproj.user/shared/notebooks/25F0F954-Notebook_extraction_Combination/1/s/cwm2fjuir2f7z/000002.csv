@@ -1,0 +1,6 @@
+"0","```r
+y <- map(word.list, names) %>%
+  unlist() %>%
+  unique()
+y <- y[-which(y == \"insertion_id\" | y == \"artificial\") ] # remove attributes associated only with ellipses.
+```"

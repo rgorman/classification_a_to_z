@@ -1,0 +1,24 @@
+"0","```r
+require(XML) # Functions to handle XML
+```"
+"1","Loading required package: XML
+"
+"0","```r
+require(tidyverse) # Functions to simplify programming and handle data frames
+```"
+"1","Loading required package: tidyverse
+Loading tidyverse: ggplot2
+Loading tidyverse: tibble
+Loading tidyverse: tidyr
+Loading tidyverse: readr
+Loading tidyverse: purrr
+Loading tidyverse: dplyr
+Conflicts with tidy packages ----------------------------------------------------------------------------------------------
+filter(): dplyr, stats
+lag():    dplyr, stats
+"
+"0","```r
+require(stringr) # Functions to handle  character strings (i.e., texts)
+```"
+"1","Loading required package: stringr
+"

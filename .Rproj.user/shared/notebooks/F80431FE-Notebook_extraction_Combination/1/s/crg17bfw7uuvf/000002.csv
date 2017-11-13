@@ -1,0 +1,17 @@
+"0","```r
+for (i in seq_along(y)) {
+  
+  if ( i == 1) {
+    
+    z <- word.list %>% map_chr(y[i]) %>%
+      data.frame(check.names = FALSE, stringsAsFactors = FALSE)
+    
+  } else {
+    
+    z <- word.list %>% map_chr(y[i]) %>%
+      cbind(z,  ., stringsAsFactors = FALSE)
+    
+  }
+}
+colnames(z) <- y # name the columns according with the attribute names
+```"

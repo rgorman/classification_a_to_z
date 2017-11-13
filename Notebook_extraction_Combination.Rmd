@@ -1,0 +1,414 @@
+---
+title: "XML pre-processing, Variable extraction and Combination"
+output: html_notebook
+---
+
+## XML Pre-processing
+
+
+This section describes how XML treebank files are prepared for analysis.
+
+
+
+## Variable Extraction
+
+This section extracts the @attributes from <word> elements of the XML treebank files.
+
+Implement necessary R packages:
+
+```{r}
+require(XML) # Functions to handle XML
+require(tidyverse) # Functions to simplify programming and handle data frames
+require(stringr) # Functions to handle  character strings (i.e., texts)
+```
+
+
+***
+
+#### Identify files to be processed and store file names and location.
+
+```{r}
+input.dir <- "./combin_input" # store target directory
+files.v <- dir(path=input.dir, pattern=".*xml") # store file names as character vector
+```
+Notes:
+
+* dir() produces a character vector of the file names in the specified location
+* The parameter "path=" takes the directory location, here stored in "input.dir."
+* The parameter "pattern=" uses a regular expression to match certain files names. In this case, ".*xml" will match all xml files. In regular expression syntax, the dot (".") matches any character, the asterisk is a quantifier that means "match the previous element zero or more times."
+
+***
+It is a good idea to check the contents of files.v to see that all are present and correct:
+
+```{r}
+files.v
+```
+
+***
+
+#### Extract all attributes from treebank XML file and store in list object.
+
+```{r}
+# read xml structure from file to .R object
+doc.object <- xmlTreeParse(file.path(input.dir, files.v[i]), useInternalNodes=TRUE)
+
+# extract all <word> elements and children into XmlNodeList object
+word.nodes <- getNodeSet(doc.object, "//word")
+
+
+word.list <- xmlApply(word.nodes, xmlToList)
+
+```
+Notes:
+
+* **xmlTreeParse()** converts and XML file to a format that can be manipulated by R.
+* The **parameter "useInternalNodes=TRUE"** is necessary for proper processing. I don't know why.
+* **xmlTreeParse()** requires the file path and name as input. These are supplied through **file.path(**), a function which pastes together its arguments with "/" as a separator. This is a convenience function. Notice that **file.v** is here subset with the index position indicated by an "i". This is an increment variable and is meant to be used within a loop when an entire directory is being processed.  The loop will be added later.
+* **getNOdeSet()** identifies and collects nodes that match a particular criterion. Here the XQuery syntax "//word" is that criterion. This notation indicates that every word node in doc.object should be stored in word.nodes, a list object.
+* **xmlApply()** is an iterator that operates on each element in word.nodes. **xmlToList()** is the function applied to each word element. The function returns a list, each of whose elements is a named character vector.  The names represent the attribute names of the word elements, the data represent the values of those attributes. **This step is useful because a list of character vectors is easier to work with than xml objects such as the contents of word.nodes.**
+
+***
+
+#### Extract the names of all attributes of the <word> elements so that they can be counted and also combined into new variables.
+
+```{r}
+y <- map(word.list, names) %>%
+  unlist() %>%
+  unique()
+
+y <- y[-which(y == "insertion_id" | y == "artificial") ] # remove attributes associated only with ellipses.
+
+```
+Notes:
+
+* **map()** is an iterator that applies a function to every element in a list or vector and returns a list. Here it applies the **names()** function to word.list.
+* **%>%** is a pipe function that passes the results of the code to its left to the code following. It makes code easier to write and read since it is possible to avoid nesting of functions and their arguments.
+* **unlist()** converts the output of names() to a character vector and **unique()** eliminates duplicates.
+* **insertion_id** and **artificial** are removed from the vector of attributes, since they only occur with ellipses and contain no additional syntactic information. **Failure to remove these attributes will break subsequent code.**
+
+
+As of 10-9-17, each word element has the following attributes (values may often be "NA" or "null"):
+
+* Attributes 1-6: the original treebank attributes (e.g., @id, @form, @lemma, etc.); these are not used for directly for syntactic analysis.
+* 7:. **cite.** This attribute contains human readable meta data on author, text, etc. These data should be kept associated with other variables to provide the ability to isolate words for analysis and for identifying trouble with the code.
+* 8: **Subtree.** This attribute contains the id numbers of those nodes which form the graph-theoretical "subtree" of a given node. The subtree is made up of the node itself and all nodes depending **directly or indirectly** upon it. This attribute is not used directly in syntactic analysis (because it is a sequence of integers without inherent syntactic meaning).
+* 9-10: **Projectivity and Planarity.** These attributes give information about the relationship between the subtree of a node and the word order of those nodes. It will be used for syntactic analysis, but its value for that purpose is still unknown.
+* 11: **DepDist.** This attributes records the distance (in the linear order of words) between each node and its parent node. The value may be "NA" for nodes dependent on the root or nodes dependent on ellipses. This attribute is not used directly in syntactic analysis, but it is the basis of other attributes and variables.
+* 12: **Neighborhood.** This attribute contains the id numbers of those nodes which form the graph-theoretical "neighborhood" of a given node. The neighborhood is made up of the node itself and all nodes depending **directly**  upon it. This attribute is not used directly in syntactic analysis (because it is a sequence of integers without inherent syntactic meaning).
+* 13-15: **Relation_Subtree, POS_Subtree, and Rel_Pos_Subtree.** These (somewhat mis-named) attributes contain syntactic information on the nodes in the neighborhood of the target node. Respectively, they record the syntactic relation, the part-of-speech, and the combination of relation and part-of-speech for every node in the neighborhood. The data values of these attributes also preserve the word order of the nodes in a neighborhood. They will be used in syntactic analysis, but their value for that purpose is still unknown.
+* 16: **self-relation.** This attribute simply records the value in the "relation" attribute of the original treebank XML file. It adds the prefix "self-" so that names of the new variables containing this variable will be easier to read and understand. It will be used in syntactic analysis.
+* 17: **self-depdist.** A modification of "DepDist" analogous to "self-relation." It will be used in syntactic analysis.
+* 18-26: **Morphological attributes.** These attributes are human-readable names corresponding to the nine morphological categories recorded in the treebank "postag" attribute. Values for these attributes may be "NA". These attributes will be used for syntactic analysis.
+* 27-39: **parent- attributes.** These attributes contain the same kind of information as do attributes 9, 10, and 16-26, but for the parent of the target node. They are identified by the prefix "parent-." They may contain values of "NA" and "null." These attributes will be used for syntactic analysis.
+* 40-52: **g1-parent attributes.** Again, these attributes parallel 9, 10, and 16-26, but with data for the parent of the parent of the target node. The values for a good many of these attributes will be "NA" and especially "null," since many nodes will not have a grand-parent. These attributes will be used for syntactic analysis. 
+* 53-55: **g2-parent attributes.** These attributes give the relation, part-of-speech, and dependency distance for the "great-grand-parent" of the target node. They will be used for syntactic analysis. In particular, they will form a part of the recreation of the "sWord levels" variables of previous analyses.
+* 56-58: **g3-parent attributes.** Analogous to 53-55, but for the "previous generation" of ancestor. These will be used for syntactic analysis.
+* 59-61: **g4-parent attributes.** Analogous to 56-58, but for the "previous generation" of ancestor. These will be used for syntactic analysis.
+
+***
+
+#### Create a data frame containg the values for each attribute of each word element.
+
+
+```{r}
+for (i in seq_along(y)) {
+  
+  if ( i == 1) {
+    
+    z <- word.list %>% map_chr(y[i]) %>%
+      data.frame(check.names = FALSE, stringsAsFactors = FALSE)
+    
+  } else {
+    
+    z <- word.list %>% map_chr(y[i]) %>%
+      cbind(z,  ., stringsAsFactors = FALSE)
+    
+  }
+}
+
+colnames(z) <- y # name the columns according with the attribute names
+
+```
+
+Notes:
+
+* The for loop iterates along each element in the vector "y". These elements are then names of the attributes.
+* The if/else switch first creates a data frame with the first attribute as a column, then binds all additional attributes to it as additional columns.
+* **word.list %>% map_chr(y[i])** feeds each the contents of the list "word.list" into the map_chr() function.  This function extracts the value for the named item in the character vector. The name is given by the incremental variable used to subset "y" (i.e., **y[i]**), which is the argument to map_chr(). map.chr() returns a character vector.
+* **data.frame() and cbind()** together produce a data frame in which each row represents a word from the XML file and each column represents an attribute. All values are character vectors.
+
+*** 
+
+#### Combine attribute names to create names of new variables.
+
+
+```{r}
+
+
+################
+###################### Create all combinations of chosen variables
+
+
+
+self_attrs <- c(16:28, 13:15)
+parent_attrs <- 29:41
+g1parent_attrs <- 42:54
+g2parent_attrs  <- 55:57
+g3parent_attrs <- 58:60
+g4parent_attrs <- 61:63
+
+group1.v <- c(16, 17, 20, 29, 30, 33, 42, 43, 46, 55:63) # indices (from vector "y") for creation of sWord level variables.
+
+
+group2.v <- c(self_attrs, parent_attrs) %>%  # self and parent morphology etc.
+  unique()
+
+group3.v <- c(self_attrs, g1parent_attrs) %>% # self and g1-parent morphology etc.
+  unique()
+
+group4.v <- c(self_attrs, g2parent_attrs) %>%  # self morphology etc. and g2-parent attributes
+  unique()
+
+
+group5.v <- c(self_attrs, g3parent_attrs) %>% # self morphology etc. and g2-parent attributes
+  unique()
+
+group6.v <- c(self_attrs, g4parent_attrs) %>% # self morphology etc. and g3-parent attributes
+  unique()
+
+
+
+
+################## loops to generate new variables
+
+output.list <- vector("list", 43) # initialize list with number of elements = to sum of lengths of all input groups
+counter <- 1 # create vector to increment through output list
+
+
+nomina.v <- NULL # make empty vector to store names
+
+
+for (i in seq_along(group1.v)) { # iterate for each item in group1.v
+  output.list[[counter]] <- combn(y[group1.v], i) # make all possible combinations of variables
+  nomina.v <- paste("group1", length(group1.v), "Choose",  i, collapse = " ") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+
+
+
+##
+
+
+
+for (i in 1:5) { # iterate selected number of times
+  output.list[[counter]] <- combn(y[group2.v], i) # make all possible combinations of variables
+  nomina.v <- paste("group2", length(group2.v), "Choose",  i, collapse = " ") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+
+
+
+##
+
+
+
+for (i in 1:5) { # iterate selected number of times
+  output.list[[counter]] <- combn(y[group3.v], i) # make all possible combinations of variables
+  nomina.v <- paste("group3", length(group3.v), "Choose",  i, collapse = " ") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+
+
+
+
+##
+
+
+
+for (i in 1:5) { # iterate a selected number of times.
+  output.list[[counter]] <- combn(y[group4.v], i) # make all possible combinations of variables
+  nomina.v <- paste("group4", length(group4.v), "Choose",  i, collapse = " ") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+
+
+##
+
+
+
+
+for (i in 1:5) { # iterate a selected number of times
+  output.list[[counter]] <- combn(y[group5.v], i) # make all possible combinations of variables
+  nomina.v <- paste("group5", length(group5.v), "Choose",  i, collapse = " ") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+
+
+
+##
+
+
+
+for (i in 1:5) { # iterate a selected number of times
+  output.list[[counter]] <- combn(y[group6.v], i) # make all possible combinations of variables
+  nomina.v <- paste("group6", length(group6.v), "Choose",  i, collapse = " ") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+
+
+
+##
+
+names(output.list) <- nomina.v # add names to list elements
+
+### loop to remove impossible combinations
+
+culled.output.list <- vector("list", length(output.list)) # initialize list with same number of elements as output.list
+  
+for (i in seq_along(output.list)) { # iterate through output.list
+  combs.v <- output.list[[i]] # extract vector to check
+  
+  
+  bad_c <- NULL # create vector for output
+  
+  ## a series of anonymous functions to check for co-occurence of categories not allowed by Greek or Latin morphology
+  
+  bad_c <- apply(combs.v, 2, function(x) ("self-morph-person"  %in% x & "self-morph-gender" %in% x))
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  bad_c <- apply(combs.v, 2, function(x) ("self-morph-person"  %in% x & "self-morph-case" %in% x)) 
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  bad_c <- apply(combs.v, 2, function(x) ("self-morph-person"  %in% x & "self-morph-degree" %in% x))
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  bad_c <- apply(combs.v, 2, function(x) ("parent-morph-person"  %in% x & "parent-morph-gender" %in% x)) 
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  bad_c <- apply(combs.v, 2, function(x) ("parent-morph-person"  %in% x & "parent-morph-case" %in% x)) 
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  bad_c <- apply(combs.v, 2, function(x) ("parent-morph-person"  %in% x & "parent-morph-degree" %in% x)) 
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  culled.output.list[[i]] <- combs.v # store culled vector in list
+
+}
+
+
+names(culled.output.list) <- names(output.list) # add names to list elements
+
+
+```
+
+
+
+
+
+
+General Considerations:
+
+* Three groups of new variable names will be created. **Group 1** contains will contain the data previously assembled under the sWordLevel variables, with the addition, for each generation, of data on **dependency distance.** **Group 2** contains essentially all relevant attributes (not "form", "id", and the like) for the target word and the parent word. In particular, all morphological data is included. **Group 3** contains, once again, information for the target word; added to this is information for the grandparent of the target word.  This approach to combination seems a possibly better way to include information about the grandparent word while avoiding the combination of all three generations into one set.  Combination of all three generations at once produces c. 3.84 million combinations; the analogous combination of two generations produces c. 83,000 combinations. **Group 4** contains information for the target word and for the third ancestor (great-grand-parent) of the target word. **Group 5** contains information for the target word and for the fourth ancestor of the target word. **Group 6** contains information for the target word and for the fifth ancestor of the target word. **For Groups 4-6,** morphological information in included for the target word only. Ancestors include information only on **relation,** **depdist,** and **part-of-speech.**
+* **For group 1,** all possible combinations are generated. With 18 variables to be combined, the number of resultant combination is   $\sum_{i=1}^{18} \binom{18}{i}$ = 262,143  
+* **For groups 2 and 3,** some truncation is necessary. For example, all possible combinations of group 2 is $\sum_{i=1}^{29} \binom{29}{i} \approx {5.36} \times {10}^8$. A balance between a larger number of variables and computing complexity should be identified. For groups 2 and 3, which have 29 input variables, using i = 1:5 ($\sum_{i=1}^{5} \binom{29}{i}$) produces 146,595 combinations. With i = 1:6 ($\sum_{i=1}^{6} \binom{29}{i}$), the number of combinations is 621,615.
+* **For groups 4, 5, and 6,** truncation is also recommended. With 19 total input variables, i = 1:5 ($\sum_{i=1}^{5} \binom{19}{i}$) gives 16,663 combinations; i = 1:6 ($\sum_{i=1}^{6} \binom{19}{i}$) gives 43,795 combinations;  i = 1:7 ($\sum_{i=1}^{7} \binom{19}{i}$) gives 94,183 combinations.
+* **After removing impossible attribute combintions,** a selection including all of Group 1, and $\binom{n}{1}$ through $\binom{n}{5}$ for each of the other five groups yields a total of 572,571 combinations of attributes to serve as new variables.
+
+Notes on specifics of code:
+
+* Each loop includes the following code **output.list[[counter]] <- combn(y[group1.v], i).** The object **output.list** collects all the new variable names generated by the loop. The object **counter** increases 1 for each iteration of the loop and prevents data in **output.list** from being over-written. The function **combn()** creates all possible combinations of the vector given to it as its first input argument, with the cardinality of the output combinations fixed by the second input argument. For example, **combn(6, 2)** gives the 15 2-number combinations of the numbers 1 through 5. In **combn(y[group1.v], i)** the first input, **y[group1.v]** retrieves the relevant variables names from the vector **y** where they are stored. The second input, **i,** contains a value that increases with the iteration of the loop. The result is a series combinations with cardinality ranging from 1 to the number of times the loop repeats.
+* The code **paste("group1", length(group1.v), "Choose",  i, collapse = " ")** generates names for each list element so that we can better keep track of the different types of combinations. The function **paste()** conjoins its input variables to produce a single character string. Here, the inputs are 1) the relevant group of select varialbes, 2) the cardinality of the group (**length(group1.v)**), 3) the word "Choose", 4) the cardinality of the output combinations (**i**). These variables are joined by the parameter **collapse =, ** which here is set to a blank space. The output should look like this "group 1 12 Choose 3". This output is passed to the code **append(nomina.v, .).**  The function **append()** adds the input string to a vector without overwriting data. The first input argument is the vector to be modified, here **nomina.v,** the vector where all list element names will be stored. The second input argument is the addition to be made to the vector, here the period represents the output of the code preceding the pipe symbol (**%>%**).
+* The code block above also contains a loop which removes grammatically impossible combinations. The loop iterates through each list element of the list produced by the previous set of loops (called here **output.list**). The present loop works on 1 list element at a time. This element is first stored as a matrix (a more complicated variety of a vector) in **combs.v.** 
+
+    - The object **combs.v** is used as input for a series of functions. For example, **bad_c <- apply(combs.v, 2, function(x) ("self-morph-person"  %in% x & "self-morph-gender" %in% x))** works as follows: 
+    - the function **apply()** applies some other function to every row or column of an input array.  The first argument is the input array (here a matrix created by **combn()** in an earlier loop), the second it the margin of application (1 = apply to rows, 2 = apply to columns), and the third argument is the function to be applied. 
+    - In this case, the input function is an anonymous function created by the code within the **apply()** function: **function(x) ("self-morph-person"  %in% x & "self-morph-gender" %in% x).** This function takes its input variable **x** and checks to see if **x** contains both the strings "self-morph-person" and "self-morph-gender." In combination with the **apply()** function, this ad hoc function checks every column of the input matrix. It returns a logical vector of a length equal to the number of columns. 
+    - The next line of code, **combs.v <- subset(combs.v, select = which(bad_c == FALSE)),** uses the logical vector to drop all columns which produced a **TRUE** evaluation from the previous line of code. The function **subset()** produces a selection of those parts of an input object which meet the critera indicated in the variable **select =.** 
+    - Here the input to **select =** is **which(bad_c == FALSE).** The function **which()** gives the indices (i.e., the reference numbers) for elements of the input which correspond to its logical predicate. Here the input is **bad_c,** the logical vector of **TRUE** or **FALSE** elements for each column in **combs.v.** 
+    - The code **which(bad_c == FALSE)** gives the column number for each column in which an impossible combination was not found (hence the value **FALSE**). These columns, and these columns only, are assigned to the object **combs.v** with the effect of dropping the columns containing impossible combinations. 
+    -The process outlined here is repeated for each separate impossible combination and the result is stored in a new list object, **culled.output,list.** In the code **culled.output.list[[i]] <- combs.v ** the incremented index **[[i]]** changes the target element with every iteration of the loop and prevents the overwriting of data.
+
+***
+
+#### Populate new variables with values
+
+
+```{r}
+a <- unlist(lapply(culled.output.list[1:3], ncol))
+v.list <- vector("list", sum(a))
+counter <- 1
+var.names <- NULL
+
+t1 <- Sys.time()
+for (i in 1:3) { # Note well: This loop is truncated for testing.  The full loop will take a long time.
+  # The full loop will take seq_along(culled.output.list) its iteration variable
+  
+  var.holder <- culled.output.list[[i]]
+  
+  
+  for (j in seq_len(ncol(var.holder))) {
+    compound.vars <- apply(z, 1, function(x) paste0(x[var.holder[, j]], collapse = "-")) %>%
+      as.character()
+    
+    var.names  <- paste0(var.holder[, j], collapse = "*") %>%
+      append(var.names, .)
+    
+    compound.vars <- tolower(compound.vars) # convert to lower case
+    
+    v.list[[counter]] <- compound.vars
+  #  names(v.list[[counter]]) <- var.names
+    print(paste0(var.holder[, j], collapse = "*"))
+    counter <- counter + 1
+    
+  }
+}
+t2 <- Sys.time()
+
+com.variables.m  <- do.call(cbind, v.list) # make matrix containing new variables
+
+colnames(com.variables.m) <- var.names # name the columns
+rownames(com.variables.m) <- NULL # remove extraneous row names
+
+
+
+```
+Notes:
+
+* This code block supplies the values for the new variables created by combination. The essence of the code block is a nested loop. The outer loop iterates through each element in **culled.output.list.**  Each of those elements contains a matrix with columns constituting combinations of attribute names. 
+* The code **var.holder <- culled.output.list[[i]]** stores the one element at a time in the object **var.holder.**
+* The inner loop iterates through each column in the matrix stored in **var.holder.**
+* The code **compound.vars <- apply(z, 1, function(x) paste0(x[var.holder[, j]], collapse = "-"))** creates new variable values and stores them in the object **compound.vars.**
+
+    - The **apply()** function applies its third argument to each row (because the second argument = 1) of the first argument, here **z**. Each row of the data frame **z** contains the attribute data for each word in the target test.
+    - The anonymous function **function(x) paste0(x[var.holder[, j]], collapse = "-")** creates the variable values as follows:
+    
+        + The function **paste0()** creates a  string from its input arguments.
+        + The input argument, supplied one row at a time by **apply(),** is a subset of the data frame **z.** 
+        + The particular subsetting applied to each row in given by the variable **var.holder[, j].** The object **var.holder** contains combinations of attribute names. 
+        + Columns in matrices can be accessed by name rather than column number. For example, **z[1, "cite"]** returns the value "Selections from Cicero De Officiis 1: s-1 w-1". 
+        + Thus, **var.holder[, j]** returns all the attribute names constituting a combination in a given column. The column number is selected by iteration variable **j.**
+        + Thus, when **var.holder[, j]** is used to index a row from **z**, it returns the values, for that row, of all columns whose names are contained in the referenced column of **var.holder.**
+        + These values are conjoined into a single string by **paste0**.
+        
+* These new combinatory variables, stored in the character vector **compound.vars** are converted to lower case character by **compound.vars <- tolower(compound.vars).**   This step is necessary so that random choices of capitalization don't create phantom variable values.
+* The results are then stored as an element in the list object **v.list,** via the code **v.list[[counter]] <- compound.vars.** Again the **counter** variable in the index of **v.list** inserts each set of results into a different element of the list and avoided data being over-written.
+* The code  **paste0(var.holder[, j], collapse = "\*")** creates a name for each new combined variables. Then **append(var.names, .)** adds the new names to the storage vector.
+
+    - The input **var.holder[, j]** returns all attribute names in a given column, so that **paste0()** may conjoin them into a string.
+
+* After the loops finish, the results are processed with **com.variables.m  <- do.call(cbind, v.list).** The function **do.call()** applies a function (here **cbind(),** which adds columns to a matrix). The second argument of **do.call** is a list of arguments that will be passed to the first argument.  Here the second argument, **v.list**, is a list of character vectors. 
+
+     - Each vector contains the number of elements equal to the number of words in the target XML file.
+     - Each element of the vector is a value of a new varuable made through combination. 
+     
+* The result of **do.call(cbind, v.list)** creates a matrix with each row corresponding to a word in the target XML file. Each column holds the data for a new variable.      
+
+
+***
+#### Remove uniformative variables  

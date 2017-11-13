@@ -1,0 +1,7 @@
+"0","```r
+# read xml structure from file to .R object
+doc.object <- xmlTreeParse(file.path(input.dir, files.v[i]), useInternalNodes=TRUE)
+# extract all <word> elements and children into XmlNodeList object
+word.nodes <- getNodeSet(doc.object, \"//word\")
+word.list <- xmlApply(word.nodes, xmlToList)
+```"

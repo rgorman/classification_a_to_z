@@ -1,0 +1,100 @@
+"0","```r
+################
+###################### Create all combinations of chosen variables
+self_attrs <- c(16:28, 13:15)
+parent_attrs <- 29:41
+g1parent_attrs <- 42:54
+g2parent_attrs  <- 55:57
+g3parent_attrs <- 58:60
+g4parent_attrs <- 61:63
+group1.v <- c(16, 17, 20, 29, 30, 33, 42, 43, 46, 55:63) # indices (from vector \"y\") for creation of sWord level variables.
+group2.v <- c(self_attrs, parent_attrs) %>%  # self and parent morphology etc.
+  unique()
+group3.v <- c(self_attrs, g1parent_attrs) %>% # self and g1-parent morphology etc.
+  unique()
+group4.v <- c(self_attrs, g2parent_attrs) %>%  # self morphology etc. and g2-parent attributes
+  unique()
+group5.v <- c(self_attrs, g3parent_attrs) %>% # self morphology etc. and g2-parent attributes
+  unique()
+group6.v <- c(self_attrs, g4parent_attrs) %>% # self morphology etc. and g3-parent attributes
+  unique()
+################## loops to generate new variables
+output.list <- vector(\"list\", 43) # initialize list with number of elements = to sum of lengths of all input groups
+counter <- 1 # create vector to increment through output list
+nomina.v <- NULL # make empty vector to store names
+for (i in seq_along(group1.v)) { # iterate for each item in group1.v
+  output.list[[counter]] <- combn(y[group1.v], i) # make all possible combinations of variables
+  nomina.v <- paste(\"group1\", length(group1.v), \"Choose\",  i, collapse = \" \") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+##
+for (i in 1:5) { # iterate selected number of times
+  output.list[[counter]] <- combn(y[group2.v], i) # make all possible combinations of variables
+  nomina.v <- paste(\"group2\", length(group2.v), \"Choose\",  i, collapse = \" \") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+##
+for (i in 1:5) { # iterate selected number of times
+  output.list[[counter]] <- combn(y[group3.v], i) # make all possible combinations of variables
+  nomina.v <- paste(\"group3\", length(group3.v), \"Choose\",  i, collapse = \" \") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+##
+for (i in 1:5) { # iterate a selected number of times.
+  output.list[[counter]] <- combn(y[group4.v], i) # make all possible combinations of variables
+  nomina.v <- paste(\"group4\", length(group4.v), \"Choose\",  i, collapse = \" \") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+##
+for (i in 1:5) { # iterate a selected number of times
+  output.list[[counter]] <- combn(y[group5.v], i) # make all possible combinations of variables
+  nomina.v <- paste(\"group5\", length(group5.v), \"Choose\",  i, collapse = \" \") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+##
+for (i in 1:5) { # iterate a selected number of times
+  output.list[[counter]] <- combn(y[group6.v], i) # make all possible combinations of variables
+  nomina.v <- paste(\"group6\", length(group6.v), \"Choose\",  i, collapse = \" \") %>% # create names for elements in list
+    append(nomina.v, .) # add new names to vector
+  counter <- counter + 1 # add 1 to incremetizing vector
+}
+##
+names(output.list) <- nomina.v # add names to list elements
+### loop to remove impossible combinations
+culled.output.list <- vector(\"list\", length(output.list)) # initialize list with same number of elements as output.list
+  
+for (i in seq_along(output.list)) { # iterate through output.list
+  combs.v <- output.list[[i]] # extract vector to check
+  
+  
+  bad_c <- NULL # create vector for output
+  
+  ## a series of anonymous functions to check for co-occurence of categories not allowed by Greek or Latin morphology
+  
+  bad_c <- apply(combs.v, 2, function(x) (\"self-morph-person\"  %in% x & \"self-morph-gender\" %in% x))
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  bad_c <- apply(combs.v, 2, function(x) (\"self-morph-person\"  %in% x & \"self-morph-case\" %in% x)) 
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  bad_c <- apply(combs.v, 2, function(x) (\"self-morph-person\"  %in% x & \"self-morph-degree\" %in% x))
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  bad_c <- apply(combs.v, 2, function(x) (\"parent-morph-person\"  %in% x & \"parent-morph-gender\" %in% x)) 
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  bad_c <- apply(combs.v, 2, function(x) (\"parent-morph-person\"  %in% x & \"parent-morph-case\" %in% x)) 
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  bad_c <- apply(combs.v, 2, function(x) (\"parent-morph-person\"  %in% x & \"parent-morph-degree\" %in% x)) 
+  combs.v <- subset(combs.v, select = which(bad_c == FALSE))
+  
+  culled.output.list[[i]] <- combs.v # store culled vector in list
+}
+names(culled.output.list) <- names(output.list) # add names to list elements
+```"

@@ -1,0 +1,4 @@
+"0","```r
+input.dir <- \"./combin_input\" # store target directory
+files.v <- dir(path=input.dir, pattern=\".*xml\") # store file names as character vector
+```"
